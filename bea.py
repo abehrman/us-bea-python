@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 
-from bea_token import * # imports BEA_API_TOKEN from .env file
+from _bea_token import * # imports BEA_API_TOKEN from .env file
 
 # disable insecure HTTP request warnings
 import urllib3
