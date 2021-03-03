@@ -1,6 +1,7 @@
 import requests
 import os
 import json
+import pprint
 
 import pandas as pd
 
@@ -13,6 +14,13 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 user_ID = BEA_API_TOKEN
 
 base_url = f"http://apps.bea.gov/api/data?&UserID={user_ID}&method=GETDATASETLIST&ResultFormat=JSON"
+
+
+def _checkForError(results):
+    if results['BEAAPI']['Results'].get('Error', None) is not None:
+        print(results['BEAAPI']['Results']['Error']['APIErrorDescription'])
+        print(pprint.pformat(results['BEAAPI']['Results']['Error']['AdditionalDetail'], indent=4))
+        raise ValueError("Incorrect API specification.")
 
 
 def getDataSetList() -> pd.DataFrame:
@@ -33,6 +41,9 @@ def getDataSetList() -> pd.DataFrame:
 
     url = f"https://apps.bea.gov/api/data?&UserID={user_ID}&method={method}&ResultFormat=JSON"
     results = json.loads(getResult(url).content)
+
+    _checkForError(results)
+
     dataSetTable = pd.DataFrame.from_dict(results['BEAAPI']['Results']['Dataset'])
 
     return dataSetTable
@@ -56,6 +67,9 @@ def getParameterList(dataSetName: str) -> pd.DataFrame:
 
     url = f"https://apps.bea.gov/api/data?&UserID={user_ID}&method={method}&datasetname={dataSetName}&ResultFormat=JSON"
     results = json.loads(getResult(url).content)
+
+    _checkForError(results)
+
     paramTable = pd.DataFrame.from_dict(results['BEAAPI']['Results']['Parameter'])
     
     return paramTable
@@ -87,6 +101,8 @@ def getParameterValues(dataSetName: str, parameterName: str) -> pd.DataFrame:
                 f"&ParameterName={parameterName}" \
                 "&ResultFormat=JSON"
     results = json.loads(getResult(url).content)
+    
+    _checkForError(results)
     
     paramValueTable = pd.DataFrame.from_dict(results['BEAAPI']['Results']['ParamValue'])
 
@@ -120,6 +136,9 @@ def getParameterValuesFiltered(dataSetName: str, targetParameter: str, tableName
                 f"&TableName={tableName}" \
                 "&ResultFormat=JSON"
     results = json.loads(getResult(url).content)
+
+    _checkForError(results)
+
     filteredParamValues = results['BEAAPI']['Results']['ParamValue']
     
     filteredParamValueTable = pd.DataFrame.from_dict(results['BEAAPI']['Results']['ParamValue'])
@@ -187,15 +206,20 @@ def getData(dataSetName: str, **kwargs):
                 
     
     results = json.loads(getResult(url).content)
+
+    _checkForError(results)
     
     # dimensions are columns, datavalues are rows, notes are notes
     
-
-    data = pd.DataFrame.from_dict(results['BEAAPI']['Results']['Data'])
-    notes = pd.DataFrame.from_dict(results['BEAAPI']['Results']['Notes'])
-    columns = pd.DataFrame.from_dict(results['BEAAPI']['Results']['Dimensions'])
+    try:
+        data = pd.DataFrame.from_dict(results['BEAAPI']['Results'].get('Data'))
+        notes = pd.DataFrame.from_dict(results['BEAAPI']['Results'].get('Notes'))
+        columns = pd.DataFrame.from_dict(results['BEAAPI']['Results'].get('Dimensions'))
     
-    return data, notes   
+    except:
+        print(pprint.pformat(results,indent=4))
+
+    return data, notes, columns 
 
 def getResult(url):
     request = requests.get(url, verify=False)
